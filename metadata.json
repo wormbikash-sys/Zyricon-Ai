@@ -1,0 +1,6 @@
+{
+  "name": "NexusAI",
+  "description": "Production-ready AI chat platform powered by AICredits API with streaming, user management, daily limits, and admin panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "User profile records",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "accountType": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "name"]
+    },
+    "conversations": {
+      "title": "Conversations",
+      "description": "Chat conversations for users",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "messages": {
+      "title": "Messages",
+      "description": "Chat messages within a conversation",
+      "properties": {
+        "id": { "type": "string" },
+        "conversationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "role": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "conversationId", "role", "content"]
+    }
+  }
+}
