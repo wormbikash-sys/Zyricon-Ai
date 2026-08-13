@@ -1,9 +1,7 @@
 import express from 'express';
-import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 
 import { db } from './server/db.js';
 import authRoutes from './server/routes/auth.js';
@@ -15,19 +13,18 @@ import healthRoutes from './server/routes/health.js';
 
 dotenv.config();
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '5000', 10);
 const isProd = process.env.NODE_ENV === 'production';
-const isApiOnly = process.env.API_ONLY === 'true' || process.env.RENDER === 'true';
 
 async function startServer() {
   await db.init();
 
   const app = express();
 
-  // Trust proxy for rate limiting behind reverse proxies (Nginx / Cloud Run / Render)
+  // Trust proxy for rate limiting behind reverse proxies (Render, Cloudflare, Nginx)
   app.set('trust proxy', 1);
 
-  // Helmet with relaxed frame options for preview iframe compatibility
+  // Helmet security headers
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -35,7 +32,7 @@ async function startServer() {
     })
   );
 
-  // CORS Configuration
+  // CORS Configuration - Restrict to FRONTEND_URL or Vercel domains in production
   const frontendUrl = process.env.FRONTEND_URL;
   app.use(
     cors({
@@ -48,7 +45,6 @@ async function startServer() {
             return callback(null, true);
           }
         }
-        // Default fallback for Vercel preview domains
         if (origin.endsWith('.vercel.app')) {
           return callback(null, true);
         }
@@ -63,7 +59,7 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // API Routes
+  // API Routes ONLY (Render backend does NOT serve frontend HTML)
   app.use('/', healthRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api', chatRoutes);
@@ -71,9 +67,9 @@ async function startServer() {
   app.use('/api/user', userRoutes);
   app.use('/api/admin', adminRoutes);
 
-  // Global API error handler (Does NOT expose raw internal errors)
+  // Global API Error Handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error('[Express Global Error]:', err);
+    console.error('[Render Backend Error]:', err);
     if (res.headersSent) {
       return next(err);
     }
@@ -82,36 +78,16 @@ async function startServer() {
     });
   });
 
-  // Vite Dev Server Middleware or Static Production File Serving (if not API-only Render deployment)
-  if (!isApiOnly) {
-    if (!isProd) {
-      console.log('[Server] Mounting Vite dev middleware...');
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-    } else if (process.env.SERVE_STATIC === 'true') {
-      console.log('[Server] Production mode: Serving static files from dist...');
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
-    }
-  }
-
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
-    console.log(` Zyricon AI Server listening on port ${PORT}`);
+    console.log(` Zyricon AI API Backend running on port ${PORT}`);
     console.log(` Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(` API Only Mode: ${isApiOnly}`);
+    console.log(` CORS Allowed Origin: ${frontendUrl || 'localhost'}`);
     console.log(`=======================================================`);
   });
 }
 
 startServer().catch(err => {
-  console.error('[Fatal Server Startup Error]:', err);
+  console.error('[Fatal Render Backend Error]:', err);
   process.exit(1);
 });
-
