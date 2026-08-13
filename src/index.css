@@ -48,3 +48,31 @@
   word-break: break-word;
 }
 
+@keyframes zyriconDotPulse {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.zyricon-dot {
+  animation: zyriconDotPulse 1.3s infinite ease-in-out;
+  display: inline-block;
+}
+
+.zyricon-dot-1 {
+  animation-delay: 0ms;
+}
+
+.zyricon-dot-2 {
+  animation-delay: 150ms;
+}
+
+.zyricon-dot-3 {
+  animation-delay: 300ms;
+}
+
