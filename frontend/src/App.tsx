@@ -67,18 +67,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// Admin-only route protection
+// Admin route protection (AdminLayout handles the password gate for unauthenticated or non-admin users)
 const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== 'ADMIN') {
-    return <Navigate to="/app" replace />;
-  }
-
   return <>{children}</>;
 };
 

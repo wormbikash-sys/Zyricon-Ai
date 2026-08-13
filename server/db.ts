@@ -219,7 +219,8 @@ class Database {
     const adminEmail = 'admin@nexusai.com';
     let admin = await this.getUserByEmail(adminEmail);
     if (!admin) {
-      const passwordHash = await bcrypt.hash('adminpassword123', 10);
+      const adminSecret = process.env.ADMIN_PASSWORD || 'adminpassword123';
+      const passwordHash = await bcrypt.hash(adminSecret, 10);
       const now = new Date().toISOString();
       const today = new Date().toISOString().split('T')[0];
       const newAdmin: User = {
@@ -242,7 +243,7 @@ class Database {
         isBanned: false,
       };
       await this.createUser(newAdmin);
-      console.log('[Database] Default admin account seeded (admin@nexusai.com / adminpassword123).');
+      console.log('[Database] Admin account initialized.');
     }
 
     // Seed test user if empty

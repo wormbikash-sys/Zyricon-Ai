@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../store/authContext';
+import { api } from '../../services/api';
 import {
   Shield,
   LayoutDashboard,
@@ -16,28 +17,100 @@ import {
   Menu,
   X,
   UserCheck,
+  Lock,
+  Loader2,
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
-  const { user } = useAuth();
+  const { user, setAdminSession } = useAuth();
   const location = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const [adminPass, setAdminPass] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const handleAdminAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminPass) return;
+    setLoginError('');
+    setLoginLoading(true);
+
+    try {
+      const res = await api.adminLogin(adminPass);
+      setAdminSession(res.user, res.token);
+      setAdminPass('');
+    } catch (err: any) {
+      setLoginError(err.message || 'Invalid admin credentials');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   if (!user || user.role !== 'ADMIN') {
     return (
-      <div className="min-h-screen bg-[#090510] text-slate-100 flex items-center justify-center p-4">
-        <div className="bg-[#120824] border border-purple-800/40 rounded-2xl p-6 sm:p-8 max-w-md text-center space-y-4 shadow-2xl">
-          <Shield className="w-12 h-12 text-rose-500 mx-auto animate-pulse" />
-          <h2 className="text-xl font-bold">403 - Access Denied</h2>
-          <p className="text-xs text-slate-400">
-            Administrative privileges are required to access this dashboard.
-          </p>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white"
-          >
-            <ArrowLeft className="w-4 h-4" /> Return to Chat
-          </Link>
+      <div className="min-h-screen bg-[#090510] text-slate-100 flex items-center justify-center p-4 font-sans">
+        <div className="bg-[#120824] border border-purple-800/40 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/40 flex items-center justify-center mx-auto text-purple-400 shadow-lg shadow-purple-600/20">
+              <Shield className="w-6 h-6 text-purple-400" />
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-white">Zyricon Admin Portal</h2>
+            <p className="text-xs text-slate-400">
+              Enter server administrative password to access control panel.
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium">
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminAuth} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-purple-400" />
+                <span>Admin Password</span>
+              </label>
+              <input
+                type="password"
+                value={adminPass}
+                onChange={(e) => setAdminPass(e.target.value)}
+                placeholder="Enter server admin password"
+                required
+                className="w-full px-4 py-3 rounded-xl bg-[#0a0418] border border-purple-900/50 text-white placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-[0.99] text-xs font-bold text-white shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {loginLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <>
+                  <Shield className="w-4 h-4" />
+                  <span>Authenticate Admin</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="pt-2 text-center border-t border-purple-900/30">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Workspace</span>
+            </Link>
+          </div>
         </div>
       </div>
     );

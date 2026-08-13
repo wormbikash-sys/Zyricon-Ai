@@ -86,6 +86,15 @@ export const authRateLimiter = rateLimit({
   message: { error: 'Too many authentication attempts. Please try again later.' },
 });
 
+export const adminLoginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // max 5 admin login attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, trustProxy: false },
+  message: { error: 'Invalid admin credentials' },
+});
+
 export const chatRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 30, // max 30 requests per minute

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { db } from '../db.js';
-import { generateToken, requireAuth, AuthRequest, authRateLimiter } from '../middleware/auth.js';
+import { generateToken, requireAuth, AuthRequest, authRateLimiter, adminLoginRateLimiter } from '../middleware/auth.js';
 import { User } from '../types.js';
 
 const router = Router();
@@ -16,6 +16,85 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+});
+
+// Dedicated Admin Login Endpoint
+router.post('/admin-login', adminLoginRateLimiter, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || typeof password !== 'string') {
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    const adminSecret = process.env.ADMIN_PASSWORD;
+    let isValid = false;
+
+    if (adminSecret) {
+      isValid = password === adminSecret;
+    } else {
+      const defaultAdmin = await db.getUserByEmail('admin@nexusai.com');
+      if (defaultAdmin) {
+        isValid = await bcrypt.compare(password, defaultAdmin.passwordHash);
+      }
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    const adminEmail = 'admin@zyricon.ai';
+    let adminUser = await db.getUserByEmail(adminEmail) || await db.getUserByEmail('admin@nexusai.com');
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+
+    if (!adminUser) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      adminUser = {
+        id: 'user_admin_primary',
+        name: 'Zyricon Administrator',
+        email: adminEmail,
+        passwordHash,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+        role: 'ADMIN',
+        accountType: 'PREMIUM',
+        premium: true,
+        premiumUntil: new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000).toISOString(),
+        dailyChatLimit: 99999,
+        dailyChatsUsed: 0,
+        lastResetDate: today,
+        totalChats: 0,
+        createdAt: now,
+        updatedAt: now,
+        lastLogin: now,
+        isBanned: false,
+      };
+      await db.createUser(adminUser);
+    } else {
+      adminUser.role = 'ADMIN';
+      adminUser.premium = true;
+      adminUser.accountType = 'PREMIUM';
+      adminUser.lastLogin = now;
+      adminUser.updatedAt = now;
+      await db.updateUser(adminUser);
+    }
+
+    const token = generateToken(adminUser.id, adminUser.email, 'ADMIN');
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const { passwordHash: _, ...safeAdmin } = adminUser;
+    return res.json({
+      token,
+      user: safeAdmin,
+    });
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid admin credentials' });
+  }
 });
 
 // Register
