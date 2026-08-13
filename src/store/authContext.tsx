@@ -65,12 +65,17 @@ async function syncUserProfileWithRetry(fbUser: any, retries = 3, delayMs = 800)
         });
       }
       return; // Success
-    } catch (err) {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err || '');
+      if (errMsg.includes('closing') || errMsg.includes('hidden') || errMsg.includes('IndexedDB')) {
+        console.warn('[RTDB Sync caught transient DB closing/hidden event]:', errMsg);
+        return;
+      }
       console.warn(`[RTDB Sync Attempt ${attempt}/${retries} failed]:`, err);
       if (attempt < retries) {
         await new Promise((res) => setTimeout(res, delayMs));
       } else {
-        throw err;
+        return; // Fail gracefully without crashing UI
       }
     }
   }

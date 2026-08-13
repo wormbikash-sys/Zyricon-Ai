@@ -3,6 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   browserLocalPersistence,
+  inMemoryPersistence,
   setPersistence,
   onAuthStateChanged,
   signInWithPopup,
@@ -26,7 +27,11 @@ const app = initializeApp({
 });
 
 export const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+// Safe persistence setting with inMemoryPersistence fallback for iframe/IndexedDB constraints
+setPersistence(auth, browserLocalPersistence).catch(() => {
+  return setPersistence(auth, inMemoryPersistence).catch(() => {});
+});
 
 export const googleProvider = new GoogleAuthProvider();
 export const rtdb = getDatabase(app);
