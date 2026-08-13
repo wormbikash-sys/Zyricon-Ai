@@ -6,6 +6,35 @@ import { User, Conversation, Message, Usage, Settings, ModelInfo, AuditLog } fro
 
 const { Pool } = pg;
 
+// Firebase Realtime Database Config
+const RTDB_BASE_URL = process.env.FIREBASE_DATABASE_URL || 'https://gen-lang-client-0416950970-default-rtdb.firebaseio.com';
+
+async function syncRtdb(relPath: string, method: string = 'PUT', body?: any) {
+  try {
+    const cleanPath = relPath.startsWith('/') ? relPath : '/' + relPath;
+    const url = `${RTDB_BASE_URL}${cleanPath}.json`;
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    // Non-blocking background sync catch
+  }
+}
+
+async function getRtdb<T = any>(relPath: string): Promise<T | null> {
+  try {
+    const cleanPath = relPath.startsWith('/') ? relPath : '/' + relPath;
+    const url = `${RTDB_BASE_URL}${cleanPath}.json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
 // Default platform settings
 export const DEFAULT_SETTINGS: Settings = {
   defaultModel: process.env.DEFAULT_MODEL || 'inclusionai/ling-2.6-flash',
@@ -174,6 +203,18 @@ class Database {
   }
 
   private async seedDefaults() {
+    // Seed RTDB settings if empty
+    const currentRtdbSettings = await getRtdb('/settings');
+    if (!currentRtdbSettings || !currentRtdbSettings.systemPrompt) {
+      await syncRtdb('/settings', 'PUT', {
+        systemPrompt: DEFAULT_SETTINGS.systemPrompt,
+        defaultModel: DEFAULT_SETTINGS.defaultModel,
+        freeDailyLimit: DEFAULT_SETTINGS.freeDailyLimit,
+        premiumDailyLimit: DEFAULT_SETTINGS.premiumDailyLimit,
+        maxMessageLength: DEFAULT_SETTINGS.maxMessageLength,
+      });
+    }
+
     // Check if admin user exists
     const adminEmail = 'admin@nexusai.com';
     let admin = await this.getUserByEmail(adminEmail);
@@ -256,6 +297,21 @@ class Database {
   }
 
   async createUser(user: User): Promise<User> {
+    syncRtdb(`/users/${user.id}`, 'PUT', {
+      uid: user.id,
+      displayName: user.name,
+      email: user.email,
+      photoURL: user.avatar,
+      role: user.role,
+      accountType: user.accountType,
+      premium: user.premium,
+      premiumUntil: user.premiumUntil,
+      dailyChatLimit: user.dailyChatLimit,
+      dailyChatsUsed: user.dailyChatsUsed,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      online: true,
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         `INSERT INTO users (id, name, email, password_hash, avatar, role, account_type, premium, premium_until, daily_chat_limit, daily_chats_used, last_reset_date, total_chats, created_at, updated_at, last_login, is_banned)
@@ -275,6 +331,21 @@ class Database {
   }
 
   async updateUser(user: User): Promise<User> {
+    syncRtdb(`/users/${user.id}`, 'PUT', {
+      uid: user.id,
+      displayName: user.name,
+      email: user.email,
+      photoURL: user.avatar,
+      role: user.role,
+      accountType: user.accountType,
+      premium: user.premium,
+      premiumUntil: user.premiumUntil,
+      dailyChatLimit: user.dailyChatLimit,
+      dailyChatsUsed: user.dailyChatsUsed,
+      createdAt: user.createdAt,
+      lastLogin: user.lastLogin,
+      online: true,
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         `UPDATE users SET name=$1, avatar=$2, role=$3, account_type=$4, premium=$5, premium_until=$6,
@@ -356,6 +427,12 @@ class Database {
   }
 
   async createConversation(conv: Conversation): Promise<Conversation> {
+    syncRtdb(`/conversations/${conv.userId}/${conv.id}`, 'PUT', {
+      title: conv.title,
+      createdAt: conv.createdAt,
+      updatedAt: conv.updatedAt,
+      model: conv.model,
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         'INSERT INTO conversations (id, user_id, title, model, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -418,6 +495,12 @@ class Database {
   }
 
   async createMessage(msg: Message): Promise<Message> {
+    syncRtdb(`/conversations/${msg.conversationId}/messages/${msg.id}`, 'PUT', {
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt,
+      status: 'sent',
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         'INSERT INTO messages (id, conversation_id, role, content, model, token_usage, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -432,6 +515,11 @@ class Database {
 
   // --- USAGE & STATS METHODS ---
   async recordUsage(usage: Usage): Promise<void> {
+    syncRtdb(`/usage/${usage.userId}/${usage.date}`, 'PUT', {
+      chats: usage.requests,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         'INSERT INTO usage (id, user_id, date, requests, input_tokens, output_tokens, estimated_cost, model) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
@@ -515,6 +603,11 @@ class Database {
 
   // --- SETTINGS METHODS ---
   async getSettings(): Promise<Settings> {
+    const rtdbSettings = await getRtdb<Settings>('/settings');
+    if (rtdbSettings && typeof rtdbSettings === 'object' && rtdbSettings.systemPrompt) {
+      this.store.settings = { ...DEFAULT_SETTINGS, ...rtdbSettings };
+      return this.store.settings;
+    }
     if (this.isPg && this.pool) {
       const res = await this.pool.query('SELECT data FROM settings WHERE id = \'platform\'');
       if (res.rows.length > 0) {
@@ -525,15 +618,24 @@ class Database {
   }
 
   async updateSettings(settings: Settings): Promise<Settings> {
+    this.store.settings = { ...settings };
+    this.saveLocalStorage();
     if (this.isPg && this.pool) {
       await this.pool.query(
         'INSERT INTO settings (id, data) VALUES (\'platform\', $1) ON CONFLICT (id) DO UPDATE SET data = $1',
         [JSON.stringify(settings)]
       );
-    } else {
-      this.store.settings = { ...settings };
-      this.saveLocalStorage();
     }
+    await syncRtdb('/settings', 'PUT', {
+      systemPrompt: settings.systemPrompt,
+      defaultModel: settings.defaultModel,
+      freeDailyLimit: settings.freeDailyLimit,
+      premiumDailyLimit: settings.premiumDailyLimit,
+      maxMessageLength: settings.maxMessageLength,
+      announcement: settings.announcement,
+      maintenanceMode: settings.maintenanceMode,
+      registrationEnabled: settings.registrationEnabled,
+    });
     return settings;
   }
 
@@ -553,6 +655,13 @@ class Database {
 
   // --- AUDIT LOG METHODS ---
   async addAuditLog(log: AuditLog): Promise<void> {
+    syncRtdb(`/auditLogs/${log.id}`, 'PUT', {
+      adminUid: log.adminId,
+      action: log.action,
+      targetUser: log.targetId || null,
+      details: log.details,
+      timestamp: log.createdAt,
+    });
     if (this.isPg && this.pool) {
       await this.pool.query(
         'INSERT INTO audit_logs (id, admin_id, admin_name, action, target_id, details, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',

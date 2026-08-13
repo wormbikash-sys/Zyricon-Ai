@@ -4,19 +4,24 @@ import { db } from '../db.js';
 
 const router = Router();
 
-// GET /api/models - Returns available models catalog
+// GET /api/models - Returns available models catalog for public users
 router.get('/models', async (req, res) => {
   try {
-    const refresh = req.query.refresh === 'true';
-    const catalog = await fetchModelCatalog(refresh);
-    const settings = await db.getSettings();
-
-    const enabledModels = catalog.filter(m => m.isEnabled);
-
     return res.json({
-      models: enabledModels,
-      defaultModel: settings.defaultModel,
-      fallbackModels: settings.fallbackModels,
+      models: [
+        {
+          id: 'zyricon-ai',
+          name: 'Zyricon AI',
+          provider: 'Zyricon',
+          description: 'Advanced multi-modal AI intelligence engine',
+          contextWindow: 128000,
+          isEnabled: true,
+          isPremiumOnly: false,
+          visionSupport: true,
+        },
+      ],
+      defaultModel: 'Zyricon AI',
+      fallbackModels: [],
     });
   } catch (err) {
     console.error('[GET /api/models Error]:', err);

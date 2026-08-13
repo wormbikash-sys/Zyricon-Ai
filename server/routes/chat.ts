@@ -17,9 +17,20 @@ const chatRequestSchema = z.object({
 router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
+    const isUserAdmin = req.user!.role === 'ADMIN';
+
+    // Security Check: Reject forbidden parameters submitted from frontend
+    if ('systemPrompt' in req.body || 'premium' in req.body || 'dailyChatsUsed' in req.body) {
+      return res.status(400).json({ error: 'System configuration parameters cannot be set by client.' });
+    }
+
+    if (req.body.role === 'system' || req.body.role === 'developer' || req.body.role === 'tool') {
+      return res.status(400).json({ error: 'Unauthorized role parameter in request.' });
+    }
+
     const settings = await db.getSettings();
 
-    if (settings.maintenanceMode && req.user!.role !== 'ADMIN') {
+    if (settings.maintenanceMode && !isUserAdmin) {
       return res.status(503).json({ error: 'System is currently in maintenance mode. Please try again later.' });
     }
 
@@ -41,6 +52,10 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
     const user = await db.getUserById(userId);
     if (!user) return res.status(404).json({ error: 'User account not found.' });
 
+    if (user.isBanned) {
+      return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
+    }
+
     const today = new Date().toISOString().split('T')[0];
     if (user.lastResetDate !== today) {
       user.dailyChatsUsed = 0;
@@ -48,23 +63,26 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
     }
 
     const effectiveLimit = user.premium ? settings.premiumDailyLimit : user.dailyChatLimit || settings.freeDailyLimit;
-    if (user.dailyChatsUsed >= effectiveLimit && req.user!.role !== 'ADMIN') {
+    if (user.dailyChatsUsed >= effectiveLimit && !isUserAdmin) {
       return res.status(429).json({
         error: `Daily chat limit reached (${user.dailyChatsUsed}/${effectiveLimit}). Upgrade to Premium for higher limits!`,
       });
     }
 
-    // Determine model
+    // Determine model server-side
+    // Normal users always use backend defaultModel. Only admins can optionally specify a test model.
+    const selectedModelId = isUserAdmin && requestedModel ? requestedModel : settings.defaultModel;
+    const publicModelDisplayName = 'Zyricon AI';
+
     const catalog = await fetchModelCatalog();
-    const selectedModelId = requestedModel || user.accountType === 'PREMIUM' ? (requestedModel || settings.defaultModel) : settings.defaultModel;
     const modelMeta = catalog.find(m => m.id === selectedModelId);
 
-    if (modelMeta && !modelMeta.isEnabled && req.user!.role !== 'ADMIN') {
-      return res.status(400).json({ error: `Model "${selectedModelId}" is currently disabled.` });
+    if (modelMeta && !modelMeta.isEnabled && !isUserAdmin) {
+      return res.status(400).json({ error: 'The AI model is currently undergoing routine maintenance.' });
     }
 
-    if (modelMeta && modelMeta.isPremiumOnly && !user.premium && req.user!.role !== 'ADMIN') {
-      return res.status(403).json({ error: `Model "${selectedModelId}" is reserved for Premium subscribers.` });
+    if (modelMeta && modelMeta.isPremiumOnly && !user.premium && !isUserAdmin) {
+      return res.status(403).json({ error: 'This AI configuration is reserved for Premium subscribers.' });
     }
 
     // Load or Create Conversation
@@ -76,7 +94,7 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found.' });
       }
-      if (conversation.userId !== userId && req.user!.role !== 'ADMIN') {
+      if (conversation.userId !== userId && !isUserAdmin) {
         return res.status(403).json({ error: 'Unauthorized access to this conversation.' });
       }
       conversation.model = selectedModelId;
@@ -100,6 +118,11 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
     // Fetch conversation message history
     const existingMessages = await db.getMessagesByConversationId(conversation.id);
 
+    // Filter message history to include ONLY user and assistant messages
+    const cleanHistory = existingMessages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
     // Save User Message
     const userMsgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_u`;
     const userMessageObj: Message = {
@@ -107,15 +130,15 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
       conversationId: conversation.id,
       role: 'user',
       content: message,
-      model: selectedModelId,
+      model: isUserAdmin ? selectedModelId : publicModelDisplayName,
       createdAt: now,
     };
     await db.createMessage(userMessageObj);
 
-    // Prepare message context for AI completion
+    // Prepare message context for AI completion - SYSTEM PROMPT STRICTLY AT INDEX 0
     const messagesForAI: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: settings.systemPrompt },
-      ...existingMessages.map(m => ({ role: m.role, content: m.content })),
+      ...cleanHistory,
       { role: 'user', content: message },
     ];
 
@@ -125,8 +148,9 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    // Send metadata header first
-    res.write(`data: ${JSON.stringify({ type: 'start', conversationId: conversation.id, model: selectedModelId })}\n\n`);
+    // Send metadata header first (displaying publicModelDisplayName to non-admins)
+    const clientModelLabel = isUserAdmin ? selectedModelId : publicModelDisplayName;
+    res.write(`data: ${JSON.stringify({ type: 'start', conversationId: conversation.id, model: clientModelLabel })}\n\n`);
 
     let accumulatedResponse = '';
 
@@ -147,7 +171,7 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
           conversationId: conversation!.id,
           role: 'assistant',
           content: fullText,
-          model: actualModel,
+          model: isUserAdmin ? actualModel : publicModelDisplayName,
           createdAt: new Date().toISOString(),
         };
         await db.createMessage(assistantMessageObj);
@@ -172,7 +196,7 @@ router.post('/chat', requireAuth, chatRateLimiter, async (req: AuthRequest, res)
         };
         await db.recordUsage(usageObj);
 
-        res.write(`data: ${JSON.stringify({ type: 'done', messageId: assistantMsgId, modelUsed: actualModel })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'done', messageId: assistantMsgId, modelUsed: clientModelLabel })}\n\n`);
         res.write('data: [DONE]\n\n');
         res.end();
       },

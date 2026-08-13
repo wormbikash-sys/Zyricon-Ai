@@ -132,6 +132,74 @@ router.post('/logout', (req, res) => {
   return res.json({ message: 'Logged out successfully.' });
 });
 
+// Google Login / Sync
+router.post('/google', authRateLimiter, async (req, res) => {
+  try {
+    const { uid, email, name, photoURL } = req.body;
+    if (!uid || !email) {
+      return res.status(400).json({ error: 'Missing Google authentication payload' });
+    }
+
+    const settings = await db.getSettings();
+    let user = await db.getUserById(uid) || await db.getUserByEmail(email);
+
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+
+    if (!user) {
+      if (!settings.registrationEnabled) {
+        return res.status(403).json({ error: 'User registration is currently disabled by administrator.' });
+      }
+
+      user = {
+        id: uid,
+        name: name || 'Zyricon User',
+        email,
+        passwordHash: 'GOOGLE_OAUTH_USER',
+        avatar: photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+        role: 'USER',
+        accountType: 'FREE',
+        premium: false,
+        premiumUntil: null,
+        dailyChatLimit: settings.freeDailyLimit,
+        dailyChatsUsed: 0,
+        lastResetDate: today,
+        totalChats: 0,
+        createdAt: now,
+        updatedAt: now,
+        lastLogin: now,
+        isBanned: false,
+      };
+      await db.createUser(user);
+    } else {
+      if (user.isBanned) {
+        return res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      }
+
+      if (user.lastResetDate !== today) {
+        user.dailyChatsUsed = 0;
+        user.lastResetDate = today;
+      }
+      user.name = name || user.name;
+      user.avatar = photoURL || user.avatar;
+      user.lastLogin = now;
+      user.updatedAt = now;
+      await db.updateUser(user);
+    }
+
+    const token = generateToken(user.id, user.email, user.role);
+    const { passwordHash: _, ...safeUser } = user;
+
+    return res.json({
+      token,
+      user: safeUser,
+    });
+  } catch (err) {
+    console.error('[Google Auth Sync Error]:', err);
+    return res.status(500).json({ error: 'Failed to authenticate with Google. Please try again.' });
+  }
+});
+
 // Me
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   try {

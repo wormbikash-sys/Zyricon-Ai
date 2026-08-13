@@ -1,0 +1,52 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "role": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "accountType": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "premium": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "premiumUntil": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "dailyChatLimit": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "dailyChatsUsed": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        }
+      }
+    },
+    "conversations": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "settings": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    },
+    "usage": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "referrals": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "auditLogs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    }
+  }
+}

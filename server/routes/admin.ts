@@ -207,8 +207,8 @@ router.get('/system-prompt', async (req, res) => {
   }
 });
 
-// POST /api/admin/system-prompt
-router.post('/system-prompt', async (req: AuthRequest, res) => {
+// POST & PUT /api/admin/system-prompt
+const handleSaveSystemPrompt = async (req: AuthRequest, res: any) => {
   try {
     const { systemPrompt, defaultModel, fallbackModels, temperature, maxTokens, enableStreaming } = req.body;
 
@@ -228,13 +228,16 @@ router.post('/system-prompt', async (req: AuthRequest, res) => {
     };
 
     await db.updateSettings(updated);
-    await audit(req, 'SYSTEM_PROMPT_UPDATE', undefined, 'AI System behavior & prompt updated');
+    await audit(req, 'SYSTEM_PROMPT_UPDATE', undefined, `Updated system prompt (${systemPrompt.length} chars)`);
 
     return res.json({ message: 'AI System Prompt updated successfully.', settings: updated });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update system prompt.' });
   }
-});
+};
+
+router.post('/system-prompt', handleSaveSystemPrompt);
+router.put('/system-prompt', handleSaveSystemPrompt);
 
 // GET /api/admin/aicredits/balance
 router.get('/aicredits/balance', async (req, res) => {

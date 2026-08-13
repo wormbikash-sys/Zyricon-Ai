@@ -37,6 +37,15 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   // --- AUTH ---
+  async loginWithGoogle(payload: { uid: string; email: string; name?: string | null; photoURL?: string | null }): Promise<{ token: string; user: User }> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+  },
+
   async login(email: string, password: string): Promise<{ token: string; user: User }> {
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',

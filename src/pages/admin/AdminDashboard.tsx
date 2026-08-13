@@ -91,47 +91,47 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Users</span>
-            <Users className="w-4 h-4 text-indigo-400" />
+      {/* Metric Cards Grid - 2 Column on Mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-[#0d061c] border border-purple-900/40 rounded-2xl p-3.5 sm:p-5 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-purple-300">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total Users</span>
+            <Users className="w-4 h-4 text-purple-400 shrink-0" />
           </div>
-          <p className="text-2xl font-black text-slate-100">{stats?.totalUsers || 0}</p>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <p className="text-xl sm:text-2xl font-black text-white">{stats?.totalUsers || 0}</p>
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-slate-400">
             <span>Free: {stats?.freeUsers || 0}</span>
-            <span className="text-amber-400 font-semibold flex items-center gap-1">
+            <span className="text-amber-400 font-semibold flex items-center gap-0.5">
               <Crown className="w-3 h-3" /> PRO: {stats?.premiumUsers || 0}
             </span>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Conversations</span>
-            <MessageSquare className="w-4 h-4 text-cyan-400" />
+        <div className="bg-[#0d061c] border border-purple-900/40 rounded-2xl p-3.5 sm:p-5 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-purple-300">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Conversations</span>
+            <MessageSquare className="w-4 h-4 text-cyan-400 shrink-0" />
           </div>
-          <p className="text-2xl font-black text-slate-100">{stats?.totalConversations || 0}</p>
-          <p className="text-[11px] text-slate-400">Total Messages: {stats?.totalMessages || 0}</p>
+          <p className="text-xl sm:text-2xl font-black text-white">{stats?.totalConversations || 0}</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Msgs: {stats?.totalMessages || 0}</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Today Requests</span>
-            <Zap className="w-4 h-4 text-emerald-400" />
+        <div className="bg-[#0d061c] border border-purple-900/40 rounded-2xl p-3.5 sm:p-5 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-purple-300">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Today Requests</span>
+            <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
-          <p className="text-2xl font-black text-slate-100">{stats?.todayRequests || 0}</p>
-          <p className="text-[11px] text-emerald-400">Completions served today</p>
+          <p className="text-xl sm:text-2xl font-black text-white">{stats?.todayRequests || 0}</p>
+          <p className="text-[10px] sm:text-[11px] text-emerald-400 font-medium truncate">Completions today</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold uppercase tracking-wider">Est. AI Cost</span>
-            <DollarSign className="w-4 h-4 text-purple-400" />
+        <div className="bg-[#0d061c] border border-purple-900/40 rounded-2xl p-3.5 sm:p-5 space-y-2 shadow-lg">
+          <div className="flex items-center justify-between text-purple-300">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Est. AI Cost</span>
+            <DollarSign className="w-4 h-4 text-purple-400 shrink-0" />
           </div>
-          <p className="text-2xl font-black text-slate-100">${stats?.estimatedCost?.toFixed(4) || '0.0000'}</p>
-          <p className="text-[11px] text-slate-400">Based on token usage logs</p>
+          <p className="text-xl sm:text-2xl font-black text-white">${stats?.estimatedCost?.toFixed(4) || '0.0000'}</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">Token usage logs</p>
         </div>
       </div>
 

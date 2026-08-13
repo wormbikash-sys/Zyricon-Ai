@@ -72,8 +72,10 @@ export const ChatPage: React.FC = () => {
   }, [activeConvId]);
 
   useEffect(() => {
-    loadConversations();
-  }, []);
+    if (user) {
+      loadConversations();
+    }
+  }, [user?.id]);
 
   const loadConversations = async () => {
     try {
